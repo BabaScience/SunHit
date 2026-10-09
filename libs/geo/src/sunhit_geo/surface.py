@@ -5,6 +5,8 @@ Layout on the object store (bucket `surface`):
     <region>/<version>/manifest.json
     <region>/<version>/near_ground.tif        terrain, metres above sea level (float32, NaN = no data)
     <region>/<version>/near_building_h.tif    building height above ground, metres (float32, 0 = none)
+    <region>/<version>/near_building_src.tif  where each building height came from (uint8 codes,
+                                              sunhit_geo.horizon.HEIGHT_SOURCE_NAMES)
     <region>/<version>/near_canopy.tif        canopy height above ground, metres (float32, 0 = none)
     <region>/<version>/far_terrain.tif        coarse terrain for the far horizon (float32)
 
@@ -18,7 +20,7 @@ import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-NEAR_LAYERS = ("near_ground", "near_building_h", "near_canopy")
+NEAR_LAYERS = ("near_ground", "near_building_h", "near_building_src", "near_canopy")
 FAR_LAYERS = ("far_terrain",)
 
 
@@ -62,6 +64,7 @@ class RegionConfig:
     far_res_m: float
     defaults: dict
     extra_building_rasters: list[dict] = field(default_factory=list)
+    building_height_sources: list[dict] = field(default_factory=list)
     description: str = ""
 
     @classmethod

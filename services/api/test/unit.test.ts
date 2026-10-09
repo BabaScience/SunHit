@@ -57,10 +57,13 @@ describe("util", () => {
   });
 
   it("collapses horizon sources into azimuth runs", () => {
-    expect(sourceSegments(["terrain", "terrain", "building", "terrain"], 90)).toEqual([
-      { from_azimuth_deg: 0, to_azimuth_deg: 180, source: "terrain" },
-      { from_azimuth_deg: 180, to_azimuth_deg: 270, source: "building" },
-      { from_azimuth_deg: 270, to_azimuth_deg: 360, source: "terrain" },
+    expect(
+      sourceSegments(["terrain", "building", "building", "terrain"], 90, [null, "ctrn", "default", null]),
+    ).toEqual([
+      { from_azimuth_deg: 0, to_azimuth_deg: 90, source: "terrain", height_source: null },
+      { from_azimuth_deg: 90, to_azimuth_deg: 180, source: "building", height_source: "ctrn" },
+      { from_azimuth_deg: 180, to_azimuth_deg: 270, source: "building", height_source: "default" },
+      { from_azimuth_deg: 270, to_azimuth_deg: 360, source: "terrain", height_source: null },
     ]);
   });
 });

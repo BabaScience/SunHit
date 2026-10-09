@@ -6,6 +6,7 @@ Sources:
   Copernicus GLO-30 DSM (ESA, free)             far-terrain fallback where TINITALY has no data
   Meta/WRI canopy height v2 (CC BY 4.0)         about 1 m, read as a window from the public COGs
   OpenStreetMap buildings (ODbL)                footprints and height tags, via Overpass
+  Building heights, per region config           e.g. Lazio CTRN (CC BY 4.0), Urban Atlas 2012 (EEA)
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from rasterio.io import MemoryFile
 from rasterio.merge import merge
 from rasterio.windows import from_bounds
 
+from sunhit_dsm.heights import fetch_ctrn_lazio, fetch_urban_atlas
 from sunhit_geo.surface import Bounds, RegionConfig
 
 TINITALY_WCS = (
@@ -47,7 +49,9 @@ SOURCES_MD = """# Raw sample sources ({region})
 | tinitaly_near.tif, tinitaly_far.tif | TINITALY 1.1 DTM, INGV | CC BY 4.0 | Tarquini S. et al. (2023). TINITALY, a digital elevation model of Italy with a 10 meters cell size (Version 1.1). INGV. https://doi.org/10.13127/tinitaly/1.1 |
 | glo30_far.tif | Copernicus DEM GLO-30 | Copernicus DEM licence (free, commercial use allowed) | © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA |
 | canopy_near.tif | Meta & WRI High Resolution Canopy Height v2 | CC BY 4.0 | Meta / World Resources Institute, Global Canopy Height |
-| osm_buildings.geojson | OpenStreetMap | ODbL 1.0 | © OpenStreetMap contributors |
+| osm_buildings.json | OpenStreetMap | ODbL 1.0 | © OpenStreetMap contributors |
+| ctrn/*_UN_VOL.* | Regione Lazio, Carta Tecnica Regionale Numerica 2014 1:5,000 (DBGT) | CC BY 4.0 | © Regione Lazio |
+| urban_atlas_height.tif | Copernicus Land Monitoring Service, Urban Atlas Building Height 2012 | EEA re-use policy (free, commercial use allowed, acknowledge source) | © European Union, Copernicus Land Monitoring Service, European Environment Agency (EEA) |
 """
 
 
@@ -256,6 +260,16 @@ def main() -> None:
     fetch_canopy(near, raw / "canopy_near.tif")
     print("OSM buildings")
     fetch_osm_buildings(near, raw / "osm_buildings.json", chunks=3)
+
+    for hs in region.building_height_sources:
+        if hs["type"] == "ctrn_lazio":
+            print(f"CTRN Lazio ({hs['province']}): volumetric units with heights")
+            fetch_ctrn_lazio(hs["province"], region.near_bounds(), region.crs, raw / "ctrn")
+        elif hs["type"] == "urban_atlas_2012":
+            print("Urban Atlas Building Height 2012 (10 m)")
+            fetch_urban_atlas(region.near_bounds(), region.crs, raw / "urban_atlas_height.tif")
+        else:
+            raise ValueError(f"unknown building height source {hs['type']}")
 
     (raw / "SOURCES.md").write_text(SOURCES_MD.format(region=region.name), encoding="utf-8")
     print(f"done: {raw}")

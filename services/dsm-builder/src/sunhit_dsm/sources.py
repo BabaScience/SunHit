@@ -22,8 +22,22 @@ from rasterio.warp import Resampling, reproject
 from shapely.geometry import MultiPolygon, Polygon, shape
 from shapely.ops import linemerge, polygonize, transform, unary_union
 
-# Quality scale shared by all layers (0-100). User calibration will sit above LiDAR.
-Q_USER, Q_LIDAR, Q_OSM_HEIGHT, Q_RASTER, Q_OSM_LEVELS, Q_DEFAULT = 100, 90, 70, 60, 55, 10
+# Quality scale shared by all layers (0-100); per pixel, the highest wins.
+# Building heights, in the priority order of decision 0002:
+Q_USER = 100  # user calibration (later)
+Q_LIDAR = 90  # national / regional LiDAR (parked)
+Q_CTRN = 80  # regional technical map, surveyed heights
+Q_OSM_HEIGHT = 70  # OSM height tag
+Q_RASTER = 60  # any extra building-height raster from the region config
+Q_OSM_LEVELS = 55  # OSM building:levels x level height
+Q_URBAN_ATLAS = 40  # Urban Atlas 2012 block heights, only inside known footprints
+Q_DEFAULT = 10  # footprint with no height information
+
+# Per-pixel height-source codes written to near_building_src.tif (0 = no building).
+HEIGHT_SOURCE_BY_QUALITY = {
+    Q_USER: 6, Q_LIDAR: 7, Q_CTRN: 1, Q_OSM_HEIGHT: 2, Q_RASTER: 8, Q_OSM_LEVELS: 3,
+    Q_URBAN_ATLAS: 4, Q_DEFAULT: 5,
+}
 
 
 @dataclass
@@ -107,7 +121,7 @@ def parse_height(tags: dict, level_height_m: float) -> tuple[float | None, str, 
     if h:
         m = _NUM.match(h)
         if m:
-            return float(m.group(1).replace(",", ".")), "tag:height", Q_OSM_HEIGHT
+            return float(m.group(1).replace(",", ".")), "osm_height", Q_OSM_HEIGHT
     levels = tags.get("building:levels")
     if levels:
         m = _NUM.match(levels)
@@ -115,7 +129,7 @@ def parse_height(tags: dict, level_height_m: float) -> tuple[float | None, str, 
             n = float(m.group(1).replace(",", "."))
             roof = tags.get("roof:levels")
             extra = 0.5 * float(roof) if roof and roof.replace(".", "", 1).isdigit() else 0.0
-            return (n + extra) * level_height_m, "tag:levels", Q_OSM_LEVELS
+            return (n + extra) * level_height_m, "osm_levels", Q_OSM_LEVELS
     return None, "default", Q_DEFAULT
 
 
@@ -201,4 +215,51 @@ class OsmBuildingsSource:
             hit = np.isfinite(h)
             values[hit] = h[hit]
             quality[hit] = q
+        return SourceRaster(values, quality)
+
+
+# --- Regional technical map volumes (CTRN / DBGT UN_VOL) ----------------------------------
+
+@dataclass
+class CtrnVolumesSource:
+    """Surveyed volumetric units with their height above ground (UN_VOL_AV).
+
+    Volumes split a building into parts of different height, so they are rasterized as they are;
+    where volumes overlap (elevated parts), the tallest wins.
+    """
+
+    paths: list[Path]
+    crs: str = "EPSG:25833"
+    name: str = "ctrn"
+    layer: str = "buildings"
+    license: str = "CC-BY-4.0"
+    commercial_ok: bool = True
+    height_field: str = "UN_VOL_AV"
+
+    def read(self, grid: Grid) -> SourceRaster:
+        import pyogrio.raw
+        import shapely
+
+        to_grid = Transformer.from_crs(self.crs, grid.crs, always_xy=True)
+        # Grid bounds in the source CRS, to read only what we need.
+        left, top = grid.transform.c, grid.transform.f
+        right = left + grid.transform.a * grid.shape[1]
+        bottom = top + grid.transform.e * grid.shape[0]
+        back = Transformer.from_crs(grid.crs, self.crs, always_xy=True)
+        xs, ys = back.transform([left, right, left, right], [bottom, bottom, top, top])
+        bbox = (min(xs), min(ys), max(xs), max(ys))
+
+        geoms, heights = [], []
+        for path in self.paths:
+            _, _, wkb, fields = pyogrio.raw.read(path, columns=[self.height_field], bbox=bbox)
+            g = shapely.force_2d(shapely.from_wkb(wkb))
+            h = np.asarray(fields[0], dtype=np.float64)
+            ok = np.isfinite(h) & (h > 0) & ~shapely.is_empty(g)
+            geoms.extend(g[ok])
+            heights.extend(h[ok])
+        print(f"  ctrn: {len(geoms)} volumes in the grid")
+        order = np.argsort(heights)  # later shapes overwrite: tallest last
+        shapes = ((transform(to_grid.transform, geoms[i]), float(heights[i])) for i in order)
+        values = rasterize(shapes, out_shape=grid.shape, transform=grid.transform, fill=np.nan, dtype="float32")
+        quality = np.where(np.isfinite(values), Q_CTRN, 0).astype(np.uint8)
         return SourceRaster(values, quality)

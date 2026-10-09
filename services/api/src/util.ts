@@ -41,13 +41,14 @@ export function dateRange(from: string, to: string, maxDays: number): string[] {
   return Array.from({ length: days }, (_, i) => new Date(start + i * 86_400_000).toISOString().slice(0, 10));
 }
 
-/** Collapses a per-azimuth source array into runs. */
-export function sourceSegments(source: string[], stepDeg: number) {
-  const out: { from_azimuth_deg: number; to_azimuth_deg: number; source: string }[] = [];
+/** Collapses per-azimuth obstruction and height sources into runs. */
+export function sourceSegments(source: string[], stepDeg: number, heightSource: (string | null)[] = []) {
+  const out: { from_azimuth_deg: number; to_azimuth_deg: number; source: string; height_source: string | null }[] = [];
   source.forEach((s, i) => {
+    const h = heightSource[i] ?? null;
     const last = out[out.length - 1];
-    if (last && last.source === s) last.to_azimuth_deg = (i + 1) * stepDeg;
-    else out.push({ from_azimuth_deg: i * stepDeg, to_azimuth_deg: (i + 1) * stepDeg, source: s });
+    if (last && last.source === s && last.height_source === h) last.to_azimuth_deg = (i + 1) * stepDeg;
+    else out.push({ from_azimuth_deg: i * stepDeg, to_azimuth_deg: (i + 1) * stepDeg, source: s, height_source: h });
   });
   return out;
 }

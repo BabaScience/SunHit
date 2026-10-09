@@ -5,36 +5,169 @@
   "description": "Per-spot horizon profile: highest blocking angle per azimuth (clockwise from north).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["spot_id", "built_at", "surface_version", "azimuth_step_deg", "elevation_deg", "source", "distance_m", "canopy_elevation_deg", "segments", "ground_elevation_m", "eye_elevation_m", "confidence", "notes"],
+  "required": [
+    "spot_id",
+    "built_at",
+    "surface_version",
+    "azimuth_step_deg",
+    "elevation_deg",
+    "source",
+    "distance_m",
+    "canopy_elevation_deg",
+    "segments",
+    "ground_elevation_m",
+    "eye_elevation_m",
+    "confidence",
+    "notes",
+    "height_source",
+    "default_height_share",
+    "height_confidence"
+  ],
   "definitions": {
-    "source": { "type": "string", "enum": ["none", "terrain", "building", "tree", "user"] }
+    "source": {
+      "type": "string",
+      "enum": [
+        "none",
+        "terrain",
+        "building",
+        "tree",
+        "user"
+      ]
+    },
+    "height_source": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "ctrn",
+        "osm_height",
+        "osm_levels",
+        "urban_atlas",
+        "default",
+        "user",
+        "lidar",
+        "raster",
+        null
+      ],
+      "description": "Where a building's height came from; null when the obstruction is not a building"
+    }
   },
   "properties": {
-    "spot_id": { "type": "string" },
-    "built_at": { "type": "string", "format": "date-time" },
-    "surface_version": { "type": "string" },
-    "azimuth_step_deg": { "type": "number" },
-    "elevation_deg": { "type": "array", "items": { "type": ["number", "null"] } },
-    "source": { "type": "array", "items": { "$ref": "#/definitions/source" } },
-    "distance_m": { "type": "array", "items": { "type": ["number", "null"] } },
-    "canopy_elevation_deg": { "type": "array", "items": { "type": ["number", "null"] }, "description": "Top of tree canopy where it rises above the solid horizon, null otherwise" },
+    "spot_id": {
+      "type": "string"
+    },
+    "built_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "surface_version": {
+      "type": "string"
+    },
+    "azimuth_step_deg": {
+      "type": "number"
+    },
+    "elevation_deg": {
+      "type": "array",
+      "items": {
+        "type": [
+          "number",
+          "null"
+        ]
+      }
+    },
+    "source": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/source"
+      }
+    },
+    "distance_m": {
+      "type": "array",
+      "items": {
+        "type": [
+          "number",
+          "null"
+        ]
+      }
+    },
+    "canopy_elevation_deg": {
+      "type": "array",
+      "items": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "description": "Top of tree canopy where it rises above the solid horizon, null otherwise"
+    },
     "segments": {
       "type": "array",
       "description": "Runs of azimuth sharing the same obstruction source",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["from_azimuth_deg", "to_azimuth_deg", "source"],
+        "required": [
+          "from_azimuth_deg",
+          "to_azimuth_deg",
+          "source",
+          "height_source"
+        ],
         "properties": {
-          "from_azimuth_deg": { "type": "number" },
-          "to_azimuth_deg": { "type": "number" },
-          "source": { "$ref": "#/definitions/source" }
+          "from_azimuth_deg": {
+            "type": "number"
+          },
+          "to_azimuth_deg": {
+            "type": "number"
+          },
+          "source": {
+            "$ref": "#/definitions/source"
+          },
+          "height_source": {
+            "$ref": "#/definitions/height_source"
+          }
         }
       }
     },
-    "ground_elevation_m": { "type": "number" },
-    "eye_elevation_m": { "type": "number" },
-    "confidence": { "type": "string", "enum": ["modelled", "calibrated"] },
-    "notes": { "type": "array", "items": { "type": "string" } }
+    "ground_elevation_m": {
+      "type": "number"
+    },
+    "eye_elevation_m": {
+      "type": "number"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "modelled",
+        "calibrated"
+      ]
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "height_source": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/height_source"
+      },
+      "description": "Per azimuth, for building obstructions"
+    },
+    "default_height_share": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Share of building-obstructed azimuths whose height is the default guess"
+    },
+    "height_confidence": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "low"
+      ],
+      "description": "low when more than 20% of building-obstructed azimuths use the default height: calibrate this spot first"
+    }
   }
 }

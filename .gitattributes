@@ -1,0 +1,4 @@
+# Keep LF in the repo and in checkouts: scripts and Dockerfiles run in Linux containers.
+* text=auto eol=lf
+*.tif binary
+*.zip binary

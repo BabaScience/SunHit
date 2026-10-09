@@ -77,5 +77,6 @@ docker run --rm -v "$PWD/libs/geo:/src" ghcr.io/astral-sh/uv:python3.12-bookworm
 
 ## Data and licences
 TINITALY 1.1 (CC BY 4.0), Copernicus DEM GLO-30, Meta/WRI canopy height v2 (CC BY 4.0),
-OpenStreetMap (ODbL). Attribution is in `data/samples/<region>/raw/SOURCES.md` after fetching.
-GlobalBuildingAtlas is **CC BY-NC** and is not used by default (see decisions 0001 §6).
+OpenStreetMap (ODbL), Regione Lazio CTRN 2014 (CC BY 4.0), Urban Atlas Building Height 2012 (EEA re-use).
+Attribution is in `data/samples/<region>/raw/SOURCES.md` after fetching. Building heights are stacked by
+priority (decision 0002). GlobalBuildingAtlas is **CC BY-NC** and is not used.

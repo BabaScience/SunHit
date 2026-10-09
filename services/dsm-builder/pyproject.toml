@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
   "sunhit-geo[surface]",
   "requests>=2.32",
+  "pyogrio>=0.10",
   "psycopg[binary]>=3.2",
 ]
 

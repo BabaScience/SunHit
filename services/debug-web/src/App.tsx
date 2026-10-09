@@ -296,8 +296,10 @@ export function App() {
             <h2>Horizon · {horizon.surface_version}</h2>
             <Polar horizon={horizon} spot={spot} date={date} segments={day?.segments ?? []} />
             <p className="hint">
-              Ground {horizon.ground_elevation_m} m · eye {horizon.eye_elevation_m} m a.s.l. ·{" "}
-              {horizon.segments.length} source runs. {horizon.notes.join(" ")}
+              Building heights: <b>{horizon.height_confidence}</b> confidence (
+              {Math.round(horizon.default_height_share * 100)}% default) · sources{" "}
+              {[...new Set(horizon.height_source.filter(Boolean))].join(", ") || "none"} · ground{" "}
+              {horizon.ground_elevation_m} m · eye {horizon.eye_elevation_m} m a.s.l. {horizon.notes.join(" ")}
             </p>
           </>
         )}

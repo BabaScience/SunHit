@@ -21,14 +21,19 @@ from affine import Affine
 from rasterio.warp import Resampling
 
 from sunhit_dsm.sources import (
+    HEIGHT_SOURCE_BY_QUALITY,
+    Q_CTRN,
     Q_DEFAULT,
     Q_RASTER,
+    Q_URBAN_ATLAS,
+    CtrnVolumesSource,
     Grid,
     OsmBuildingsSource,
     RasterSource,
     fuse,
     read_osm_buildings,
 )
+from sunhit_geo.horizon import HEIGHT_SOURCE_NAMES
 from sunhit_geo.surface import Bounds, Manifest, ObjectStore, RegionConfig
 
 
@@ -36,16 +41,47 @@ def grid_for(bounds: Bounds, res: float, crs: str) -> Grid:
     return Grid(crs, Affine(res, 0, bounds.left, 0, -res, bounds.top), bounds.shape(res))
 
 
-def write_cog(path: Path, data: np.ndarray, grid: Grid, nodata: float | None) -> None:
+def write_cog(path: Path, data: np.ndarray, grid: Grid, nodata: float | None, dtype: str = "float32") -> None:
     tmp = path.with_suffix(".tmp.tif")
+    predictor = 3 if dtype == "float32" else 2
     with rasterio.open(
-        tmp, "w", driver="GTiff", height=grid.shape[0], width=grid.shape[1], count=1, dtype="float32",
-        crs=grid.crs, transform=grid.transform, nodata=nodata, tiled=True, compress="deflate", predictor=3,
-        BIGTIFF="IF_SAFER",
+        tmp, "w", driver="GTiff", height=grid.shape[0], width=grid.shape[1], count=1, dtype=dtype,
+        crs=grid.crs, transform=grid.transform, nodata=nodata, tiled=True, compress="deflate",
+        predictor=predictor, BIGTIFF="IF_SAFER",
     ) as dst:
-        dst.write(data.astype("float32"), 1)
-    rasterio.shutil.copy(tmp, path, driver="COG", compress="deflate", predictor="3", BIGTIFF="IF_SAFER")
+        dst.write(data.astype(dtype), 1)
+    rasterio.shutil.copy(tmp, path, driver="COG", compress="deflate", predictor=str(predictor), BIGTIFF="IF_SAFER")
     tmp.unlink()
+
+
+def rasterize_footprints(buildings: list, grid: Grid) -> np.ndarray:
+    """1-based index of the OSM footprint covering each pixel (0 = none)."""
+    from pyproj import Transformer
+    from rasterio.features import rasterize
+    from shapely.ops import transform
+
+    to_grid = Transformer.from_crs("EPSG:4326", grid.crs, always_xy=True).transform
+    return rasterize(((transform(to_grid, b.geom), i + 1) for i, b in enumerate(buildings)),
+                     out_shape=grid.shape, transform=grid.transform, fill=0, dtype="int32")
+
+
+def update_footprint_heights(buildings: list, height: np.ndarray, src: np.ndarray, index: np.ndarray) -> None:
+    """Give each footprint the tallest fused height inside it and the source of that height, so the
+    buildings table reflects the best data, not only its OSM tags."""
+    flat = index.ravel()
+    sel = np.flatnonzero(flat)
+    ids, h, s = flat[sel], height.ravel()[sel], src.ravel()[sel]
+    order = np.lexsort((h, ids))  # by footprint, then height: the last of each run is the max
+    ids, h, s = ids[order], h[order], s[order]
+    last = np.flatnonzero(np.r_[ids[1:] != ids[:-1], True])
+    for i, hh, ss in zip(ids[last], h[last], s[last]):
+        b = buildings[i - 1]
+        if hh > 0 and ss:
+            b.height_m, b.height_source = float(hh), HEIGHT_SOURCE_NAMES[int(ss)]
+    counts = {}
+    for b in buildings:
+        counts[b.height_source] = counts.get(b.height_source, 0) + 1
+    print(f"  footprint heights after fusion: {counts}")
 
 
 def allowed(src, allow_noncommercial: bool) -> bool:
@@ -81,10 +117,13 @@ def build(region: RegionConfig, raw: Path, out_root: Path, allow_noncommercial: 
 
     print("buildings")
     buildings = list(read_osm_buildings(raw / "osm_buildings.json", d["building_height_m"], d["level_height_m"]))
-    print(f"  {len(buildings)} OSM footprints; heights: "
+    print(f"  {len(buildings)} OSM footprints; tagged heights: "
           + ", ".join(f"{k}={sum(1 for b in buildings if b.height_source == k)}"
-                      for k in ("tag:height", "tag:levels", "default")))
+                      for k in ("osm_height", "osm_levels", "default")))
     building_sources = [OsmBuildingsSource(buildings)]
+    ctrn = sorted((raw / "ctrn").glob("*_UN_VOL.shp")) if (raw / "ctrn").exists() else []
+    if ctrn:
+        building_sources.append(CtrnVolumesSource(ctrn))
     for extra in region.extra_building_rasters:
         building_sources.append(RasterSource(
             extra["name"], "buildings", Path(extra["path"]), extra.get("quality", Q_RASTER),
@@ -93,6 +132,36 @@ def build(region: RegionConfig, raw: Path, out_root: Path, allow_noncommercial: 
     building_sources = [s for s in building_sources if allowed(s, allow_noncommercial)]
     building_h, building_q = fuse(building_sources, near, fill=0.0)
     building_h = np.nan_to_num(building_h, nan=0.0)
+    footprint_index = rasterize_footprints(buildings, near)
+    if ctrn:
+        # Surveyed volumes are authoritative for geometry too: in a footprint that overlaps them,
+        # leftover OSM pixels (outline misalignment, courtyards OSM drew filled) are dropped.
+        # Footprints with no surveyed volume (built after the survey) keep their OSM pixels.
+        covered = np.zeros(len(buildings) + 1, dtype=bool)
+        covered[np.unique(footprint_index[building_q == Q_CTRN])] = True
+        covered[0] = False
+        drop = covered[footprint_index] & (building_q != Q_CTRN) & (building_h > 0)
+        building_h[drop] = 0.0
+        building_q[drop] = 0
+        print(f"  dropped {int(drop.sum())} OSM pixels inside surveyed footprints; "
+              f"{int(covered.sum())} of {len(buildings)} footprints overlap the survey")
+
+    ua_path = raw / "urban_atlas_height.tif"
+    if ua_path.exists():
+        # 10 m block heights: only used to replace the default inside known footprints, never to
+        # create buildings (a 10 m block pixel straddles streets).
+        ua = RasterSource("urban-atlas-2012", "buildings", ua_path, Q_URBAN_ATLAS, "EEA-reuse", True,
+                          Resampling.nearest, min_value=0.5).read(near)
+        take = (building_q == Q_DEFAULT) & np.isfinite(ua.values)
+        building_h[take] = ua.values[take]
+        building_q[take] = Q_URBAN_ATLAS
+        print(f"  urban atlas replaced the default on {int(take.sum())} pixels")
+    building_src = np.zeros(building_q.shape, dtype=np.uint8)
+    for q, code in HEIGHT_SOURCE_BY_QUALITY.items():
+        building_src[building_q == q] = code
+    building_src[building_h <= 0] = 0
+    update_footprint_heights(buildings, building_h, building_src, footprint_index)
+    del footprint_index
 
     print("canopy")
     canopy_src = RasterSource("meta-wri-chm-v2", "canopy", raw / "canopy_near.tif", 50, "CC-BY-4.0", True,
@@ -109,13 +178,19 @@ def build(region: RegionConfig, raw: Path, out_root: Path, allow_noncommercial: 
     ]:
         print(f"  writing {name}")
         write_cog(out / f"{name}.tif", arr, near, nodata)
+    print("  writing near_building_src")
+    write_cog(out / "near_building_src.tif", building_src, near, None, dtype="uint8")
     print("  writing far_terrain")
     write_cog(out / "far_terrain.tif", far_terrain, far, np.nan)
 
     coverage = {
         "ground_valid_pct": round(float(np.isfinite(ground).mean() * 100), 2),
         "building_pixels_pct": round(float((building_h > 0).mean() * 100), 2),
-        "building_default_height_pixels_pct": round(float((building_q == Q_DEFAULT).mean() * 100), 2),
+        "building_height_source_pct": {
+            HEIGHT_SOURCE_NAMES[code]: round(float((building_src == code).sum() / max((building_src > 0).sum(), 1) * 100), 2)
+            for code in sorted(set(HEIGHT_SOURCE_BY_QUALITY.values()))
+            if (building_src == code).any()
+        },
         "canopy_pixels_pct": round(float((canopy > 0).mean() * 100), 2),
         "far_terrain_valid_pct": round(float(np.isfinite(far_terrain).mean() * 100), 2),
     }
@@ -133,7 +208,10 @@ def build(region: RegionConfig, raw: Path, out_root: Path, allow_noncommercial: 
         near_radius_m=region.near_radius_m,
         far_radius_m=region.far_radius_m,
         sources=[{"name": s.name, "layer": s.layer, "license": s.license, "commercial_ok": s.commercial_ok}
-                 for s in srcs] + [{"coverage": coverage}],
+                 for s in srcs]
+        + ([{"name": "urban-atlas-2012", "layer": "buildings", "license": "EEA-reuse", "commercial_ok": True}]
+           if ua_path.exists() else [])
+        + [{"coverage": coverage}],
         built_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
     )
     (out / "manifest.json").write_text(manifest.to_json(), encoding="utf-8")

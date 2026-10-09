@@ -56,6 +56,7 @@ class GeometryService:
             x, y, height, facing,
             ground=near.ground,
             building_height=near.building_height,
+            building_height_source=near.building_height_source,
             canopy=near.canopy,
             far_terrain=region.far,
             own_footprint=self._own_footprint(region, building_id, near.ground),

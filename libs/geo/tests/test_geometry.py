@@ -184,3 +184,26 @@ def test_profile_round_trip():
 def test_transmissivity_seasons_and_hemispheres():
     assert transmissivity(15, 41.9) > transmissivity(200, 41.9)
     assert transmissivity(200, -33.9) > transmissivity(15, -33.9)
+
+
+def test_height_source_is_reported_per_azimuth():
+    ground, bh, bid, can = scene()
+    src = grid(0, np.uint8)
+    put_box(bh, -50, 50, 20, 30, 25.0)  # north: surveyed (ctrn = 1)
+    put_box(src, -50, 50, 20, 30, 1)
+    put_box(bh, -50, 50, -30, -20, 25.0)  # south: default height guess (5)
+    put_box(src, -50, 50, -30, -20, 5)
+    h = build_horizon(0, 0, 1, 90, layer(ground), layer(bh), layer(can),
+                      building_height_source=layer(src), near_radius_m=190)
+    d = h.to_dict()
+    assert d["height_source"][0] == "ctrn" and d["height_source"][180] == "default"
+    assert d["height_source"][90] is None  # open ground to the east: terrain, no building
+    assert 0.3 < h.default_height_share < 0.7
+
+
+def test_profiles_stored_before_height_sources_still_load():
+    d = flat_horizon().to_dict()
+    del d["height_source"]
+    from sunhit_geo import HorizonProfile
+
+    assert HorizonProfile.from_dict(d).height_source.sum() == 0

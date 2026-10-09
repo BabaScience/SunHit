@@ -40,6 +40,7 @@ class Region:
 class NearWindow:
     ground: RasterLayer
     building_height: RasterLayer
+    building_height_source: RasterLayer | None  # None for surfaces built before height sources
     canopy: RasterLayer
 
 
@@ -79,7 +80,12 @@ class SurfaceCache:
             f = d / f"{layer}.tif"
             if not f.exists():
                 log.info("downloading %s/%s/%s.tif", m.region, m.version, layer)
-                self.store.download(f"{m.region}/{m.version}/{layer}.tif", f)
+                try:
+                    self.store.download(f"{m.region}/{m.version}/{layer}.tif", f)
+                except Exception:
+                    if layer != "near_building_src":
+                        raise
+                    log.warning("%s/%s has no height-source layer", m.region, m.version)
         with rasterio.open(d / "far_terrain.tif") as src:
             far = RasterLayer(src.read(1).astype(np.float32), src.transform.c, src.transform.f, src.transform.a)
         return Region(m, d, Transformer.from_crs("EPSG:4326", m.crs, always_xy=True), far)
@@ -111,4 +117,8 @@ class SurfaceCache:
             a[~np.isfinite(a)] = fill if np.isfinite(fill) else np.nan
             return RasterLayer(a, x0, y0, res)
 
-        return NearWindow(read("near_ground", np.nan), read("near_building_h", 0.0), read("near_canopy", 0.0))
+        src = None
+        if region.path("near_building_src").exists():
+            src = read("near_building_src", 0.0)
+            src = RasterLayer(src.data.astype(np.uint8), src.x0, src.y0, src.res)
+        return NearWindow(read("near_ground", np.nan), read("near_building_h", 0.0), src, read("near_canopy", 0.0))

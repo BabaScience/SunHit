@@ -7,6 +7,8 @@ import { JobError } from "../jobs.js";
 import { dateRange, newId, sourceSegments, timezoneAt, todayIn } from "../util.js";
 
 export const MAX_WINDOW_DAYS = 31;
+/** Above this share of default-height obstructions, a horizon is flagged low confidence. */
+export const LOW_HEIGHT_CONFIDENCE_SHARE = 0.2;
 
 interface SpotRow {
   id: string;
@@ -131,6 +133,11 @@ export async function spotRoutes(app: FastifyInstance, deps: AppDeps) {
       });
     }
     const p = h.profile;
+    // Profiles built before height sources existed: unknown, so every building height is a guess.
+    const heightSource: (string | null)[] =
+      p.height_source ?? p.source.map((s: string) => (s === "building" ? "default" : null));
+    const defaultShare: number =
+      p.default_height_share ?? (p.source.includes("building") ? 1 : 0);
     return HorizonSchema.parse({
       spot_id: id,
       built_at: h.built_at.toISOString(),
@@ -140,7 +147,10 @@ export async function spotRoutes(app: FastifyInstance, deps: AppDeps) {
       source: p.source,
       distance_m: p.distance_m,
       canopy_elevation_deg: p.canopy_elevation_deg,
-      segments: sourceSegments(p.source, p.azimuth_step_deg),
+      height_source: heightSource,
+      default_height_share: defaultShare,
+      height_confidence: defaultShare > LOW_HEIGHT_CONFIDENCE_SHARE ? "low" : "ok",
+      segments: sourceSegments(p.source, p.azimuth_step_deg, heightSource),
       ground_elevation_m: p.ground_elevation_m,
       eye_elevation_m: p.eye_elevation_m,
       confidence: h.confidence,

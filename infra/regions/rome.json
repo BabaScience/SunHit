@@ -14,5 +14,14 @@
     "level_height_m": 3.5,
     "min_canopy_height_m": 2.5
   },
-  "extra_building_rasters": []
+  "extra_building_rasters": [],
+  "building_height_sources": [
+    {
+      "type": "ctrn_lazio",
+      "province": "Roma"
+    },
+    {
+      "type": "urban_atlas_2012"
+    }
+  ]
 }
