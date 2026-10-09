@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spot.json",
+  "title": "Spot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "lat", "lon", "height_above_ground_m", "tilt_deg", "facing_azimuth_deg", "timezone", "building_id", "horizon_status", "horizon_confidence", "created_at"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^sp_[a-z0-9]+$" },
+    "label": { "type": ["string", "null"] },
+    "lat": { "type": "number" },
+    "lon": { "type": "number" },
+    "height_above_ground_m": { "type": "number" },
+    "tilt_deg": { "type": "number" },
+    "facing_azimuth_deg": { "type": "number" },
+    "timezone": { "type": "string" },
+    "building_id": { "type": ["integer", "null"], "description": "Footprint the spot belongs to, resolved at creation" },
+    "horizon_status": { "type": "string", "enum": ["pending", "ready", "failed", "outside_coverage"] },
+    "horizon_error": { "type": ["string", "null"] },
+    "horizon_confidence": { "type": "string", "enum": ["modelled", "calibrated"] },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

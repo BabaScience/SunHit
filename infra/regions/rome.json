@@ -1,0 +1,18 @@
+{
+  "name": "rome",
+  "description": "Phase 0 sample: 10 x 10 km around the centre of Rome",
+  "center_lat": 41.8986,
+  "center_lon": 12.4769,
+  "crs": "EPSG:32633",
+  "core_half_size_m": 5000,
+  "near_radius_m": 2000,
+  "near_res_m": 1.0,
+  "far_radius_m": 50000,
+  "far_res_m": 30.0,
+  "defaults": {
+    "building_height_m": 15.0,
+    "level_height_m": 3.5,
+    "min_canopy_height_m": 2.5
+  },
+  "extra_building_rasters": []
+}

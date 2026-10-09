@@ -1,0 +1,12 @@
+{
+  "name": "sunhit",
+  "private": true,
+  "workspaces": ["libs/contracts", "services/api", "services/debug-web"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "contracts:generate": "npm run generate -w @sunhit/contracts"
+  }
+}

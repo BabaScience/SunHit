@@ -1,0 +1,25 @@
+{
+  "name": "@sunhit/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./schemas/*": "./schemas/*"
+  },
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "build": "npm run generate && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "json-schema-to-zod": "^2.6.0",
+    "@apidevtools/json-schema-ref-parser": "^11.7.0",
+    "typescript": "^5.6.0"
+  }
+}

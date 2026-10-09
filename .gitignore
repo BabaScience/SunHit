@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.env.*
+!.env.example
+data/
+*.tif
+*.part
+.pio/
+firmware/sensor-esp32/include/secrets.h

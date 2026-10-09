@@ -1,0 +1,14 @@
+# Development override: Phase 0 services only, one worker replica, debug web page.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+services:
+  horizon-builder:
+    deploy: { replicas: 1 }
+    environment:
+      LOG_LEVEL: debug
+
+  debug-web:
+    build: { context: ., dockerfile: services/debug-web/Dockerfile }
+    environment:
+      API_URL: http://api:3000
+    depends_on: [api]
+    ports: ["127.0.0.1:5173:5173"]

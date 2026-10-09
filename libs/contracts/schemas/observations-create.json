@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "observations-create.json",
+  "title": "ObservationsCreate",
+  "description": "Ground truth for a spot. A single reading or a batch (firmware sends batches after Wi-Fi drops).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["readings"],
+  "properties": {
+    "readings": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ts_utc"],
+        "properties": {
+          "ts_utc": { "type": "string", "format": "date-time" },
+          "lux": { "type": "number" },
+          "sun": { "type": "boolean", "description": "User tap: sun now / no sun now" }
+        }
+      }
+    }
+  }
+}

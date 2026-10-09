@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "horizon.json",
+  "title": "Horizon",
+  "description": "Per-spot horizon profile: highest blocking angle per azimuth (clockwise from north).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["spot_id", "built_at", "surface_version", "azimuth_step_deg", "elevation_deg", "source", "distance_m", "canopy_elevation_deg", "segments", "ground_elevation_m", "eye_elevation_m", "confidence", "notes"],
+  "definitions": {
+    "source": { "type": "string", "enum": ["none", "terrain", "building", "tree", "user"] }
+  },
+  "properties": {
+    "spot_id": { "type": "string" },
+    "built_at": { "type": "string", "format": "date-time" },
+    "surface_version": { "type": "string" },
+    "azimuth_step_deg": { "type": "number" },
+    "elevation_deg": { "type": "array", "items": { "type": ["number", "null"] } },
+    "source": { "type": "array", "items": { "$ref": "#/definitions/source" } },
+    "distance_m": { "type": "array", "items": { "type": ["number", "null"] } },
+    "canopy_elevation_deg": { "type": "array", "items": { "type": ["number", "null"] }, "description": "Top of tree canopy where it rises above the solid horizon, null otherwise" },
+    "segments": {
+      "type": "array",
+      "description": "Runs of azimuth sharing the same obstruction source",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from_azimuth_deg", "to_azimuth_deg", "source"],
+        "properties": {
+          "from_azimuth_deg": { "type": "number" },
+          "to_azimuth_deg": { "type": "number" },
+          "source": { "$ref": "#/definitions/source" }
+        }
+      }
+    },
+    "ground_elevation_m": { "type": "number" },
+    "eye_elevation_m": { "type": "number" },
+    "confidence": { "type": "string", "enum": ["modelled", "calibrated"] },
+    "notes": { "type": "array", "items": { "type": "string" } }
+  }
+}

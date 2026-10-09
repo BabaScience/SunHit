@@ -1,0 +1,9 @@
+{
+  "identities": [
+    {
+      "name": "sunhit-dev",
+      "credentials": [{ "accessKey": "sunhit", "secretKey": "sunhit-dev-secret" }],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

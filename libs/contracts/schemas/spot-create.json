@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spot-create.json",
+  "title": "SpotCreate",
+  "description": "Register a surface that can receive sun.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["lat", "lon", "height_above_ground_m", "tilt_deg", "facing_azimuth_deg"],
+  "properties": {
+    "lat": { "type": "number", "minimum": -90, "maximum": 90 },
+    "lon": { "type": "number", "minimum": -180, "maximum": 180 },
+    "height_above_ground_m": { "type": "number", "minimum": 0, "maximum": 500 },
+    "tilt_deg": { "type": "number", "minimum": 0, "maximum": 90, "description": "0 = horizontal, 90 = vertical" },
+    "facing_azimuth_deg": { "type": "number", "minimum": 0, "exclusiveMaximum": 360, "description": "Clockwise from north, 180 = south" },
+    "label": { "type": "string", "maxLength": 120 }
+  }
+}

@@ -1,0 +1,26 @@
+[project]
+name = "sunhit-geo"
+version = "0.1.0"
+description = "Shared Sun-Hit geometry: sun position, horizon ray-casting, sun windows"
+requires-python = ">=3.12"
+dependencies = [
+  "numpy>=2.0,<2.4",
+  "numba>=0.61",
+  "pandas>=2.2",
+  "pvlib>=0.11",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+# Raster I/O and object storage, for services that read or write the surface model.
+surface = ["rasterio>=1.4", "pyproj>=3.6", "shapely>=2.0", "boto3>=1.35"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sunhit_geo"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
